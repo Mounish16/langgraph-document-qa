@@ -38,3 +38,20 @@ def test_everything_else_is_a_lookup(question):
 
 def test_existing_sample_id_is_never_the_generation_target():
     assert classify("Generate LLD 3.2 again")[1] == "3.4"
+
+
+@pytest.mark.parametrize(
+    "question, mode",
+    [
+        ("Is LLD 3.1 related to the technical requirements and does it satisfy the HLD?", "q1"),
+        ("Does LLD 3.3 comply with the technical requirements and the HLD?", "q1"),
+        ("Review LLD 3.1 against the HLD.", "q1"),
+        ("Draft LLD 3.4 for the Alerting and Monitoring Service.", "q2"),
+        ("Which requirements does LLD 3.3 cover?", "lookup"),
+        ("What does LLD 3.2 say about the metadata catalog?", "lookup"),
+        ("What acceptance criterion verifies FR-8?", "lookup"),
+        ("What are the single points of failure in the HLD?", "lookup"),
+    ],
+)
+def test_readme_example_questions(question, mode):
+    assert classify(question)[0] == mode

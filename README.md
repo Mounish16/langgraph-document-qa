@@ -24,17 +24,69 @@ No cloud API, no API key and no data leaving your machine: the language model an
 | **Local-first** | Ollama (`llama3.1`, `nomic-embed-text`), FAISS on disk, Docker Compose for the whole stack. |
 | **Testable without a model** | The model clients are injected, so the full graph, the real agents and real FAISS indexes are tested with a scripted fake model. |
 
+## Why this matters
+
+In engineering programmes, a requirement is written once and then has to survive three layers of design: the High Level Design (HLD) sets the architecture, the Technical Requirements define what must be true, and each Low Level Design (LLD) says how one component will deliver it. Two problems keep recurring:
+
+- **Alignment drifts.** An LLD quietly drops a requirement, contradicts the HLD, or covers a requirement with no design evidence. Catching that means a reviewer reading hundreds of lines across several documents and building a traceability table by hand.
+- **Answers are scattered.** Even a simple question ("what is the retention period for raw data?") means knowing which of the documents holds the answer.
+
+This project automates both. It reads the whole document set, answers questions with the right document as the source, produces a **requirement-by-requirement traceability review** of any LLD, and drafts a **new LLD that follows the structure of the existing ones and is written against the requirements it must satisfy**. Everything runs on local models, so it also works for documents that must not leave your own machine.
+
 ## What it does
 
 Ask a question in plain English. The graph classifies it and takes one of three paths:
 
 | Path | Example question | Result |
 |---|---|---|
-| **Alignment review** | *Is LLD 3.2 related to the technical requirements and does it satisfy the HLD?* | Verdict, a traceability table (requirement to LLD section) and a list of gaps or contradictions. |
-| **Design generation** | *Generate LLD 3.4 from 3.1/3.2/3.3 satisfying the technical requirements and HLD* | A complete new LLD in the same structure as the existing samples. |
+| **Alignment review** | *Is LLD 3.2 related to the technical requirements and does it satisfy the HLD?* | Verdict, a traceability table (requirement or HLD element, where the LLD addresses it, status) and a list of gaps or contradictions. |
+| **Design generation** | *Generate LLD 3.4 from 3.1/3.2/3.3 satisfying the technical requirements and HLD* | A complete new LLD in the same structure as the existing samples, with a requirements-coverage table. |
 | **Lookup** | *What are the goals in the HLD?* | A cited answer from whichever document holds it, found by routing and backtracking. |
 
 Every answer is saved as Markdown and exported to DOCX and PDF when the tools are available.
+
+## The sample document set
+
+The repository ships with a small, invented document set for an *Aircraft Data Management Platform (ADMP)*, so the project runs out of the box. It is illustrative only.
+
+| Document | Contents | File |
+|---|---|---|
+| **HLD** | Architecture, drivers, constraints, target state, service continuity, risks | [`data/doc1_hld/hld.md`](data/doc1_hld/hld.md) |
+| **Technical Requirements** | Functional requirements FR-1 to FR-9, non-functional NFR-1 to NFR-7, interfaces IF-1 to IF-6, acceptance criteria AC-1 to AC-5 | [`data/doc2_techreq/techreq.md`](data/doc2_techreq/techreq.md) |
+| **LLD 3.1** | Ingestion and validation (FR-1 to FR-3, AC-1) | [`data/doc3_lld/lld_3.1.md`](data/doc3_lld/lld_3.1.md) |
+| **LLD 3.2** | Data lake storage and catalog (FR-4, FR-5, NFR-4, NFR-7, AC-5) | [`data/doc3_lld/lld_3.2.md`](data/doc3_lld/lld_3.2.md) |
+| **LLD 3.3** | Query and analytics API (FR-6, FR-9, AC-2, AC-4) | [`data/doc3_lld/lld_3.3.md`](data/doc3_lld/lld_3.3.md) |
+
+The Technical Requirements already reserve a planned **LLD 3.4** (alerting and monitoring) for FR-8, IF-5, AC-3 and NFR-5. That is the document the generation example drafts, and you can check the result against those four requirements.
+
+## Example questions
+
+Copy any of these into the web UI, the CLI or the API.
+
+**Alignment review** (reads the full LLD, Technical Requirements and HLD):
+
+- *Is LLD 3.1 related to the technical requirements and does it satisfy the HLD?*
+- *Is LLD 3.2 related to the technical requirements and does it satisfy the HLD?*
+- *Does LLD 3.3 comply with the technical requirements and the HLD?*
+- *Review LLD 3.1 against the HLD.*
+
+**Design generation** (reads all sample LLDs, the requirements and the HLD):
+
+- *Generate LLD 3.4 from 3.1/3.2/3.3 satisfying the technical requirements and HLD.*
+- *Draft LLD 3.4 for the Alerting and Monitoring Service.*
+
+**Lookup** (routed to the right document, with backtracking):
+
+- *What are the goals in the HLD?*
+- *What availability target does the platform require?*
+- *How long must raw data be retained?*
+- *Which external interfaces does the platform expose?*
+- *What acceptance criterion verifies FR-8?*
+- *Which requirements does LLD 3.3 cover?*
+- *What are the single points of failure in the HLD?*
+- *What does LLD 3.2 say about the metadata catalog?*
+
+Questions that mention an LLD together with a review word (review, satisfy, comply, relate, align, verify...) take the review path; an LLD together with a generation word (generate, draft, write, create...) takes the generation path; everything else is a lookup.
 
 ## Screenshots
 
@@ -80,7 +132,7 @@ The graph is defined in [`src/graph.py`](src/graph.py). `classify_question` and 
 - **Command line** interface ([`src/main.py`](src/main.py)).
 - **Export** to Markdown, DOCX (pandoc) and PDF (WeasyPrint) ([`src/export.py`](src/export.py)).
 - **Docker Compose stack**: Ollama, a one-shot model puller and the app.
-- **Test suite** (42 tests, no model needed) and **GitHub Actions** CI running lint, tests and a Docker build.
+- **Test suite** (50 tests, no model needed) and **GitHub Actions** CI running lint, tests and a Docker build.
 - **Sample documents** and **example outputs** in [`data/`](data) and [`docs/examples/`](docs/examples).
 
 ## Quick start (Docker)
@@ -193,7 +245,7 @@ python -m pytest
 ruff check .
 ```
 
-`python -m pytest` and the test count (42) need no Ollama.
+`python -m pytest` and the test count (50) need no Ollama.
 
 The tests replace only the two model clients. The graph, agents, prompts, FAISS indexes, API and export code are real. They cover the classifier (including regression cases for words like "build" and "make" in ordinary questions), routing order, backtracking, the no-answer path, whole-document context for review and generation, indexing, export fallbacks, the API and path-traversal protection on downloads. CI runs the same checks on every push.
 
