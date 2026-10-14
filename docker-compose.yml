@@ -1,0 +1,56 @@
+services:
+  # Local LLM server from Docker Hub (OpenAI-compatible + native API).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    # Uncomment to use an NVIDIA GPU:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    restart: unless-stopped
+
+  # One-shot job that pulls the models into the ollama volume.
+  model-puller:
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        sleep 5 &&
+        ollama pull ${LLM_MODEL:-llama3.1} &&
+        ollama pull ${EMBED_MODEL:-nomic-embed-text}
+    restart: "no"
+
+  # The LangGraph application + test web UI.
+  app:
+    build: .
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_MODEL=${LLM_MODEL:-llama3.1}
+      - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text}
+    ports:
+      - "8000:8000"          # web UI at http://localhost:8000
+    volumes:
+      - ./src:/app/src          # live-mount code so changes apply on restart
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+      - ./faiss_index:/app/faiss_index
+      - ./frontend:/app/frontend
+    # --reload restarts uvicorn automatically when a file under src/ changes.
+    command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+volumes:
+  ollama_models:

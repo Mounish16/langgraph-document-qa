@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+.DS_Store
+.Rhistory
+faiss_index/*
+!faiss_index/.gitkeep
+outputs/*
+!outputs/.gitkeep
