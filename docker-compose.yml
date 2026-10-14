@@ -27,7 +27,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >
-        sleep 5 &&
+        until ollama list > /dev/null 2>&1; do sleep 2; done &&
         ollama pull ${LLM_MODEL:-llama3.1} &&
         ollama pull ${EMBED_MODEL:-nomic-embed-text}
     restart: "no"

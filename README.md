@@ -36,6 +36,20 @@ Ask a question in plain English. The graph classifies it and takes one of three 
 
 Every answer is saved as Markdown and exported to DOCX and PDF when the tools are available.
 
+## Screenshots
+
+**Alignment review** of LLD 3.2 against the Technical Requirements and the HLD, with a traceability table and PDF / DOCX / Markdown downloads:
+
+![Alignment review](docs/screenshots/02-alignment-review.png)
+
+**Design generation**: a complete new LLD 3.4 drafted from the three sample LLDs:
+
+![Generated LLD](docs/screenshots/03-generate-lld.png)
+
+**Lookup**: a factual question routed to the right document:
+
+![Lookup answer](docs/screenshots/04-lookup.png)
+
 ## The workflow
 
 ```mermaid
@@ -78,31 +92,33 @@ git clone https://github.com/Mounish16/langgraph-document-qa.git
 cd langgraph-document-qa
 cp .env.example .env
 docker compose up -d --build
-docker compose logs -f model-puller     # wait until both models are pulled, then Ctrl+C
+docker compose logs -f model-puller
 ```
 
-Open **http://localhost:8000**. The indexes are built automatically on your first question.
+Press Ctrl+C once the log shows both models have been pulled, then open **http://localhost:8000**. The indexes are built automatically on your first question. To confirm the models are present: `docker exec ollama ollama list`.
+
+> **Memory and speed.** Review and generation put whole documents into a 16k-token context, which needs several GB of free memory on top of the model itself for `llama3.1`. Docker Desktop on macOS cannot use the Apple GPU and limits memory, so answers are slow and the model can be stopped for lack of memory. On a Mac, [run without Docker](#run-without-docker) with the native Ollama app instead. On a smaller machine, set `LLM_MODEL=llama3.2:3b` in `.env`.
 
 Stop with `docker compose down` (add `-v` to also delete the downloaded models).
 
 ## Run without Docker
 
-Requires Python 3.11 and [Ollama](https://ollama.com) running locally.
+Requires Python 3.11 or newer and [Ollama](https://ollama.com) running locally. This is the fastest option on a Mac, because Ollama can use the GPU.
 
 ```bash
 ollama pull llama3.1
 ollama pull nomic-embed-text
 
 python3 -m venv .venv
-source .venv/bin/activate              # Windows: .venv\Scripts\Activate.ps1
+source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 
-python -m src.ingest                   # build the FAISS indexes from data/
-uvicorn src.api:app --port 8000        # web UI at http://localhost:8000
+python -m src.ingest
+python -m uvicorn src.api:app --port 8000
 ```
 
-DOCX and PDF export are optional: install [pandoc](https://pandoc.org/installing.html) for DOCX and the WeasyPrint system libraries for PDF. Without them the answer is still saved as Markdown.
+On Windows, activate with `.venv\Scripts\Activate.ps1`. DOCX and PDF export are optional: install [pandoc](https://pandoc.org/installing.html) for DOCX and the WeasyPrint system libraries for PDF. Without them the answer is still saved as Markdown.
 
 ### Command line
 
@@ -133,7 +149,7 @@ Sample outputs for the bundled documents are in [`docs/examples/`](docs/examples
 - [Alignment review of LLD 3.2](docs/examples/alignment_review_lld_3_2.md) ([PDF](docs/examples/alignment_review_lld_3_2.pdf))
 - [Generated LLD 3.4](docs/examples/generated_lld_3_4.md) ([PDF](docs/examples/generated_lld_3_4.pdf))
 
-Output quality depends on the local model, so your results will vary.
+Output quality depends on the local model, so your results will vary. The screenshots above were taken with `llama3.1`.
 
 ## Project layout
 
@@ -167,15 +183,17 @@ Set in `.env` (see [`.env.example`](.env.example)):
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` / `TOP_K` | `1000` / `150` / `5` | Chunking and retrieval |
 | `DATA_DIR` / `INDEX_DIR` / `OUTPUT_DIR` | `data` / `faiss_index` / `outputs` | Paths |
 
-To use your own documents, replace the files under `data/` (keep the three sub-folders), then rebuild with `python -m src.ingest`.
+The `.env` file is read automatically; restart the server after changing it. To use your own documents, replace the files under `data/` (keep the three sub-folders), then rebuild with `python -m src.ingest`.
 
 ## Testing
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest        # 42 tests, no Ollama required
+python -m pytest
 ruff check .
 ```
+
+`python -m pytest` and the test count (42) need no Ollama.
 
 The tests replace only the two model clients. The graph, agents, prompts, FAISS indexes, API and export code are real. They cover the classifier (including regression cases for words like "build" and "make" in ordinary questions), routing order, backtracking, the no-answer path, whole-document context for review and generation, indexing, export fallbacks, the API and path-traversal protection on downloads. CI runs the same checks on every push.
 
